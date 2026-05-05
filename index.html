@@ -56,12 +56,21 @@
 <body>
   <div class="app">
 
-    <!-- ================= 标题 ================= -->
+    <!-- ================= 标题区域 ================= -->
+    <!-- 这里是网站顶部标题，用户打开网站第一眼会看到 -->
     <h1>Allite</h1>
     <p>SPM Practice Platform</p>
 
+
     <!-- ================= 登录区域 ================= -->
-    <div id="quizBox" class="hidden">
+    <!--
+      说明：
+      1. 这一块是以后要用的登录功能
+      2. 现在先用 style="display:none;" 暂时隐藏
+      3. 不要删除，因为以后要重新打开登录时会用回
+      4. 以后要显示登录，只需要删除 style="display:none;"
+    -->
+    <div id="loginBox" style="display:none;">
       <h3>Login</h3>
 
       <!-- 用户输入邮箱 -->
@@ -73,144 +82,152 @@
       <!-- 登录按钮 -->
       <button id="loginBtn">Login</button>
 
-      <!-- 显示登录成功或失败 -->
+      <!-- 显示登录成功或失败的信息 -->
       <p id="loginMessage"></p>
     </div>
 
+
     <!-- ================= 做题区域 ================= -->
-    <div id="quizBox" 
+    <!--
+      说明：
+      1. 这一块是学生真正看到的做题页面
+      2. 现在先直接显示，不需要登录
+      3. 以后恢复登录时，可以再加回 class="hidden"
+    -->
+    <div id="quizBox">
 
-      <!-- 显示题目 -->
-      <h3 id="questionText"></h3>
+      <!-- 显示题目文字 -->
+      <h3 id="questionText">Question preview area</h3>
 
-      <!-- 四个选项 -->
+      <!-- 四个选择题按钮 -->
       <button class="option-button" id="btnA"></button>
       <button class="option-button" id="btnB"></button>
       <button class="option-button" id="btnC"></button>
       <button class="option-button" id="btnD"></button>
 
-      <!-- 显示对错 -->
+      <!-- 显示用户选择后是 Correct / Wrong -->
       <p id="result"></p>
 
-      <!-- 显示解析 -->
+      <!-- 显示答案解释 -->
       <p id="explanation"></p>
     </div>
 
   </div>
 
-  <!-- ================= JS逻辑（最重要） ================= -->
+
+  <!-- ================= JS逻辑区域 ================= -->
+  <!--
+    说明：
+    这里是网站的大脑。
+    它负责：
+    1. 连接 Firebase
+    2. 从 Firestore 读取题目
+    3. 显示题目和选项
+    4. 判断用户答案是否正确
+
+    注意：
+    现在登录功能暂时隐藏，所以这里暂时不引入 Firebase Auth。
+    以后要恢复登录时，再加回 Auth 代码。
+  -->
   <script type="module">
 
-    // ================= 1. 引入 Firebase 模块 =================
-    // initializeApp → 启动Firebase
+    // ================= 1. 引入 Firebase 基础模块 =================
+    // initializeApp 的作用：
+    // 用你的 firebaseConfig 启动 Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
 
-    // 登录功能
-    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 
-    // 数据库（题库）
+    // ================= 2. 引入 Firestore 数据库模块 =================
+    // getFirestore：连接 Firestore 数据库
+    // collection：指定要读取哪个 collection，例如 questions
+    // getDocs：读取 collection 里面的资料
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
 
-    // ================= 2. Firebase 配置 =================
-    // 👉 这是你从 Firebase 拿到的 config
+    // ================= 3. Firebase 配置 =================
+    // 说明：
+    // 这是你在 Firebase 项目里拿到的 Web App config。
+    // 它告诉网页要连接哪一个 Firebase 项目。
     const firebaseConfig = {
-      apiKey: "你的key",
-      authDomain: "你的domain",
-      projectId: "你的projectId",
-      storageBucket: "你的bucket",
-      messagingSenderId: "你的senderId",
-      appId: "你的appId"
+      apiKey: "AIzaSyD9uBIfHXYv_OMhh3G4Pc1v0itgTa1Ink0",
+      authDomain: "allite-v1.firebaseapp.com",
+      projectId: "allite-v1",
+      storageBucket: "allite-v1.firebasestorage.app",
+      messagingSenderId: "70636057759",
+      appId: "1:70636057759:web:103ff546767f3ed3021eaa"
     };
 
 
-    // ================= 3. 初始化 Firebase =================
+    // ================= 4. 初始化 Firebase =================
+    // app = 启动后的 Firebase 应用
     const app = initializeApp(firebaseConfig);
 
-    // 登录系统
-    const auth = getAuth(app);
 
-    // 数据库
+    // ================= 5. 连接 Firestore 数据库 =================
+    // db 之后会用来读取 questions collection
     const db = getFirestore(app);
 
 
-    // ================= 4. 全局变量 =================
-    // 用来存当前题目
+    // ================= 6. 当前题目变量 =================
+    // currentQuestion 用来暂时保存从 Firestore 读取到的第一题
     let currentQuestion = null;
 
 
-    // ================= 5. 获取页面元素 =================
-    const loginBox = document.getElementById("loginBox");
-    const quizBox = document.getElementById("quizBox");
-    const loginBtn = document.getElementById("loginBtn");
-    const loginMessage = document.getElementById("loginMessage");
-
+    // ================= 7. 获取页面上的元素 =================
+    // 这些代码把 HTML 里的元素抓出来，方便 JS 修改内容
     const questionText = document.getElementById("questionText");
     const btnA = document.getElementById("btnA");
     const btnB = document.getElementById("btnB");
     const btnC = document.getElementById("btnC");
     const btnD = document.getElementById("btnD");
-
     const result = document.getElementById("result");
     const explanation = document.getElementById("explanation");
 
 
-    // ================= 6. 登录逻辑 =================
-    loginBtn.addEventListener("click", async () => {
-
-      // 获取用户输入
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-
-      try {
-        // Firebase 登录
-        await signInWithEmailAndPassword(auth, email, password);
-
-        loginMessage.innerText = "Login successful";
-
-        // 隐藏登录，显示题目
-        loginBox.classList.add("hidden");
-        quizBox.classList.remove("hidden");
-
-        // 登录后加载题目
-        loadQuestion();
-
-      } catch (error) {
-        loginMessage.innerText = "Login failed: " + error.message;
-      }
-    });
-
-
-    // ================= 7. 从数据库读取题目 =================
+    // ================= 8. 读取题目函数 =================
+    // 作用：
+    // 1. 去 Firestore 的 questions collection 读取题目
+    // 2. 暂时只拿第一题
+    // 3. 如果没有题目，就显示提示
     async function loadQuestion() {
 
-      // 从 "questions" collection 读取
+      // 从 Firestore 读取 questions collection
       const querySnapshot = await getDocs(collection(db, "questions"));
 
-      // 只取第一题
+      // 遍历所有题目，但现在只取第一题
       querySnapshot.forEach((doc) => {
         if (!currentQuestion) {
           currentQuestion = doc.data();
         }
       });
 
+      // 如果 Firestore 没有题目，就显示提示
+      if (!currentQuestion) {
+        questionText.innerText = "No question found. Please add a question in Firestore.";
+        return;
+      }
+
+      // 如果成功读到题目，就显示出来
       showQuestion();
     }
 
 
-    // ================= 8. 显示题目 =================
+    // ================= 9. 显示题目函数 =================
+    // 作用：
+    // 把 Firestore 读取到的题目和选项显示在页面上
     function showQuestion() {
 
-      // 显示题目
+      // 显示题目文字
       questionText.innerText = currentQuestion.question;
 
-      // 显示选项
+      // 显示四个选项
       btnA.innerText = "A. " + currentQuestion.optionA;
       btnB.innerText = "B. " + currentQuestion.optionB;
       btnC.innerText = "C. " + currentQuestion.optionC;
       btnD.innerText = "D. " + currentQuestion.optionD;
 
-      // 绑定点击事件
+      // 给每个按钮绑定点击事件
+      // 学生点击哪个按钮，就把 A/B/C/D 传给 checkAnswer()
       btnA.onclick = () => checkAnswer("A");
       btnB.onclick = () => checkAnswer("B");
       btnC.onclick = () => checkAnswer("C");
@@ -218,21 +235,28 @@
     }
 
 
-    // ================= 9. 判题逻辑 =================
+    // ================= 10. 判题函数 =================
+    // 作用：
+    // 1. 检查学生点击的答案是否等于 Firestore 里的 answer
+    // 2. 显示 Correct 或 Wrong
+    // 3. 显示英文解释 explanation_en
     function checkAnswer(choice) {
 
-      // 如果用户答案 == 正确答案
+      // 如果学生答案等于正确答案
       if (choice === currentQuestion.answer) {
         result.innerText = "✅ Correct";
       } else {
         result.innerText = "❌ Wrong. Correct answer: " + currentQuestion.answer;
       }
 
-      // 显示解析
+      // 显示答案解释
       explanation.innerText = currentQuestion.explanation_en;
     }
-    
+
+
+    // ================= 11. 页面打开后自动读取题目 =================
+    // 因为现在暂时不用登录，所以页面一打开就直接 loadQuestion()
     loadQuestion();
+
   </script>
 </body>
-</html>
