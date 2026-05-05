@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- 页面基本设置 -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Allite V1</title>
+
+  <!-- ================= UI样式 ================= -->
+  <style>
+    /* 整体页面背景 */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      margin: 0;
+      padding: 20px;
+    }
+
+    /* 主容器（白色卡片） */
+    .app {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+    }
+
+    /* 输入框 */
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    /* 按钮 */
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    /* 选项按钮样式 */
+    .option-button {
+      background: #eee;
+    }
+
+    /* 隐藏元素（默认不显示） */
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- ================= 标题 ================= -->
+    <h1>Allite</h1>
+    <p>SPM Practice Platform</p>
+
+    <!-- ================= 登录区域 ================= -->
+    <div id="loginBox">
+      <h3>Login</h3>
+
+      <!-- 用户输入邮箱 -->
+      <input id="email" placeholder="Enter email" />
+
+      <!-- 用户输入密码 -->
+      <input id="password" type="password" placeholder="Enter password" />
+
+      <!-- 登录按钮 -->
+      <button id="loginBtn">Login</button>
+
+      <!-- 显示登录成功或失败 -->
+      <p id="loginMessage"></p>
+    </div>
+
+    <!-- ================= 做题区域 ================= -->
+    <div id="quizBox" class="hidden">
+
+      <!-- 显示题目 -->
+      <h3 id="questionText"></h3>
+
+      <!-- 四个选项 -->
+      <button class="option-button" id="btnA"></button>
+      <button class="option-button" id="btnB"></button>
+      <button class="option-button" id="btnC"></button>
+      <button class="option-button" id="btnD"></button>
+
+      <!-- 显示对错 -->
+      <p id="result"></p>
+
+      <!-- 显示解析 -->
+      <p id="explanation"></p>
+    </div>
+
+  </div>
+
+  <!-- ================= JS逻辑（最重要） ================= -->
+  <script type="module">
+
+    // ================= 1. 引入 Firebase 模块 =================
+    // initializeApp → 启动Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+
+    // 登录功能
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+
+    // 数据库（题库）
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+
+    // ================= 2. Firebase 配置 =================
+    // 👉 这是你从 Firebase 拿到的 config
+    const firebaseConfig = {
+      apiKey: "你的key",
+      authDomain: "你的domain",
+      projectId: "你的projectId",
+      storageBucket: "你的bucket",
+      messagingSenderId: "你的senderId",
+      appId: "你的appId"
+    };
+
+
+    // ================= 3. 初始化 Firebase =================
+    const app = initializeApp(firebaseConfig);
+
+    // 登录系统
+    const auth = getAuth(app);
+
+    // 数据库
+    const db = getFirestore(app);
+
+
+    // ================= 4. 全局变量 =================
+    // 用来存当前题目
+    let currentQuestion = null;
+
+
+    // ================= 5. 获取页面元素 =================
+    const loginBox = document.getElementById("loginBox");
+    const quizBox = document.getElementById("quizBox");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginMessage = document.getElementById("loginMessage");
+
+    const questionText = document.getElementById("questionText");
+    const btnA = document.getElementById("btnA");
+    const btnB = document.getElementById("btnB");
+    const btnC = document.getElementById("btnC");
+    const btnD = document.getElementById("btnD");
+
+    const result = document.getElementById("result");
+    const explanation = document.getElementById("explanation");
+
+
+    // ================= 6. 登录逻辑 =================
+    loginBtn.addEventListener("click", async () => {
+
+      // 获取用户输入
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        // Firebase 登录
+        await signInWithEmailAndPassword(auth, email, password);
+
+        loginMessage.innerText = "Login successful";
+
+        // 隐藏登录，显示题目
+        loginBox.classList.add("hidden");
+        quizBox.classList.remove("hidden");
+
+        // 登录后加载题目
+        loadQuestion();
+
+      } catch (error) {
+        loginMessage.innerText = "Login failed: " + error.message;
+      }
+    });
+
+
+    // ================= 7. 从数据库读取题目 =================
+    async function loadQuestion() {
+
+      // 从 "questions" collection 读取
+      const querySnapshot = await getDocs(collection(db, "questions"));
+
+      // 只取第一题
+      querySnapshot.forEach((doc) => {
+        if (!currentQuestion) {
+          currentQuestion = doc.data();
+        }
+      });
+
+      showQuestion();
+    }
+
+
+    // ================= 8. 显示题目 =================
+    function showQuestion() {
+
+      // 显示题目
+      questionText.innerText = currentQuestion.question;
+
+      // 显示选项
+      btnA.innerText = "A. " + currentQuestion.optionA;
+      btnB.innerText = "B. " + currentQuestion.optionB;
+      btnC.innerText = "C. " + currentQuestion.optionC;
+      btnD.innerText = "D. " + currentQuestion.optionD;
+
+      // 绑定点击事件
+      btnA.onclick = () => checkAnswer("A");
+      btnB.onclick = () => checkAnswer("B");
+      btnC.onclick = () => checkAnswer("C");
+      btnD.onclick = () => checkAnswer("D");
+    }
+
+
+    // ================= 9. 判题逻辑 =================
+    function checkAnswer(choice) {
+
+      // 如果用户答案 == 正确答案
+      if (choice === currentQuestion.answer) {
+        result.innerText = "✅ Correct";
+      } else {
+        result.innerText = "❌ Wrong. Correct answer: " + currentQuestion.answer;
+      }
+
+      // 显示解析
+      explanation.innerText = currentQuestion.explanation_en;
+    }
+
+  </script>
+</body>
+</html>
